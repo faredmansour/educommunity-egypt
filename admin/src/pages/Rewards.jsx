@@ -23,24 +23,30 @@ function Rewards() {
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   function load() {
-    api.getRewards().then((d) => setRewards(d.rewards || [])).catch(() => {}).finally(() => setLoading(false));
+    setLoading(true);
+    setError("");
+    api.getRewards().then((d) => setRewards(d.rewards || [])).catch((err) => setError(err.message || "تعذر تحميل المكافآت.")).finally(() => setLoading(false));
   }
 
   useEffect(() => {
     load();
-    api.getUsers().then((d) => setUsers(d.users || [])).catch(() => {});
+    api.getUsers().then((d) => setUsers(d.users || [])).catch((err) => setError(err.message || "تعذر تحميل قائمة المستخدمين."));
   }, []);
 
   async function grant(e) {
     e.preventDefault();
     setMsg("");
+    setError("");
     if (!userId || !title.trim()) {
-      setMsg("اختر المستخدم واكتب عنوان المكافأة");
+      setError("اختر المستخدم واكتب عنوان المكافأة");
       return;
     }
     try {
+      setSaving(true);
       await api.grantReward({ user: userId, title: title.trim(), type, note: note.trim() });
       setMsg("تم منح المكافأة ✅");
       setTitle("");
@@ -48,7 +54,9 @@ function Rewards() {
       setUserId("");
       load();
     } catch (err) {
-      setMsg(err.message);
+      setError(err.message || "تعذر منح المكافأة.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -64,6 +72,7 @@ function Rewards() {
       <p className="text-sm text-slate-400 mb-5">حفّز المتفوقين وكافئ جهودهم — امنح شارة أو جائزة أو تكريم.</p>
 
       {msg && <p className="text-sm bg-blue-50 text-blue-700 rounded-lg p-2 mb-4">{msg}</p>}
+      {error && <p role="alert" className="text-sm bg-red-50 text-red-700 rounded-lg p-3 mb-4">{error}</p>}
 
       {/* نموذج المنح */}
       <form onSubmit={grant} className={`${card} p-4 mb-6 grid sm:grid-cols-4 gap-3 items-end`}>
@@ -86,8 +95,8 @@ function Rewards() {
             {TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
-        <button className="bg-blue-600 text-white font-bold text-sm py-2 rounded-xl flex items-center justify-center gap-1">
-          <Plus className="w-4 h-4" /> امنح الآن
+        <button disabled={saving} className="bg-blue-600 text-white font-bold text-sm py-2 rounded-xl flex items-center justify-center gap-1 disabled:opacity-50">
+          <Plus className="w-4 h-4" /> {saving ? "جارٍ الحفظ..." : "امنح الآن"}
         </button>
         <div className="sm:col-span-4">
           <input value={note} onChange={(e) => setNote(e.target.value)} className={input} placeholder="ملاحظة (اختياري)" />
@@ -98,7 +107,7 @@ function Rewards() {
       <div className={`${card} overflow-hidden`}>
         <div className="px-4 py-3 border-b border-slate-100 font-bold text-slate-700 text-sm">أحدث المكافآت الممنوحة</div>
         {loading && <p className="p-4 text-sm text-slate-400">جاري التحميل…</p>}
-        {!loading && rewards.length === 0 && <p className="p-6 text-center text-sm text-slate-400">لم تُمنح أي مكافآت بعد.</p>}
+        {!loading && !error && rewards.length === 0 && <p className="p-6 text-center text-sm text-slate-400">لم تُمنح أي مكافآت بعد.</p>}
         <div className="divide-y divide-slate-50">
           {rewards.map((r) => {
             const meta = typeMeta(r.type);

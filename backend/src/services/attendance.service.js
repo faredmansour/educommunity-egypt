@@ -44,14 +44,13 @@ async function listAll() {
     .limit(200);                 // بنحدّد العدد عشان الرد مايبقاش تقيل
 
   // نجمّع إجمالي الوقت لكل مدرس عشان الأدمن يقارن بسهولة
-  const totalsMap = {};
-  sessions.forEach((s) => {
-    const name = s.teacher?.name || 'غير معروف'; // ممكن المدرس يكون اتحذف
-    totalsMap[name] = (totalsMap[name] || 0) + (s.durationMinutes || 0);
-  });
-
-  // نحوّل الأوبجكت لمصفوفة [{ name, minutes }] عشان الفرونت يعرضها في جدول
-  const totals = Object.entries(totalsMap).map(([name, minutes]) => ({ name, minutes }));
+  const totals = await Attendance.aggregate([
+    { $group: { _id: '$teacher', minutes: { $sum: { $ifNull: ['$durationMinutes', 0] } } } },
+    { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'teacher' } },
+    { $unwind: { path: '$teacher', preserveNullAndEmptyArrays: true } },
+    { $project: { _id: 0, name: { $ifNull: ['$teacher.name', 'غير معروف'] }, minutes: 1 } },
+    { $sort: { minutes: -1, name: 1 } },
+  ]);
 
   return { sessions, totals };
 }

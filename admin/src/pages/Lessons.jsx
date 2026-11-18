@@ -6,9 +6,10 @@ import { api } from "../api.js";
 function Lessons() {
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    api.getLessons().then((d) => setLessons(d.lessons || [])).catch(() => {}).finally(() => setLoading(false));
+    api.getLessons().then((d) => setLessons(d.lessons || [])).catch((err) => setError(err.message || "تعذر تحميل الدروس.")).finally(() => setLoading(false));
   }, []);
 
   const card = "bg-white rounded-2xl border border-slate-100 shadow-sm";
@@ -22,7 +23,8 @@ function Lessons() {
       <p className="text-sm text-slate-400 mb-5">كل الدروس المباشرة اللي أنشأها المدرسون.</p>
 
       {loading && <p className="text-sm text-slate-400">جاري التحميل...</p>}
-      {!loading && lessons.length === 0 && (
+      {error && <p role="alert" className="text-sm bg-red-50 text-red-700 rounded-lg p-3 mb-4">{error}</p>}
+      {!loading && !error && lessons.length === 0 && (
         <div className={`${card} p-8 text-center text-slate-400 text-sm`}>لا توجد دروس مجدولة.</div>
       )}
 

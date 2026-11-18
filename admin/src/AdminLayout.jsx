@@ -27,7 +27,12 @@ function AdminLayout({ children }) {
     navigate("/login");
   }
 
-  const adminName = JSON.parse(localStorage.getItem("admin_user") || "{}")?.name || "الأدمن";
+  let adminName = "الأدمن";
+  try {
+    adminName = JSON.parse(localStorage.getItem("admin_user") || "{}")?.name || adminName;
+  } catch {
+    // A malformed cached profile should not prevent the admin shell from rendering.
+  }
 
   return (
     <div className="min-h-screen flex">

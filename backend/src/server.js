@@ -1,9 +1,16 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+const missingEnv = ['JWT_SECRET', 'JWT_REFRESH_SECRET'].filter((key) => !process.env[key]?.trim());
+if (missingEnv.length) {
+  console.error(`Missing required environment variables: ${missingEnv.join(', ')}. Set them in backend/.env before starting the server.`);
+  process.exit(1);
+}
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const morgan = require('morgan');
-const path = require('path');
 
 const connectDB = require('./config/db');
 const initSocket = require('./config/socket');

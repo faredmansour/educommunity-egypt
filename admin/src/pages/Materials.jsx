@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { FileCheck2, Check, Trash2, FileText, Upload, Plus, X, Search, ExternalLink } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { FileCheck2, Check, Trash2, FileText, Upload, Plus, X, Search, ExternalLink, ChevronRight, ChevronLeft } from "lucide-react";
 import { api } from "../api.js";
 
 const GRADES = [
@@ -22,8 +22,11 @@ const TABS = [
 // يبحث ويفلتر بالمادة أو المدرس، يوافق/يرفض، ويرفع مواد الوزارة.
 function Materials() {
   const [materials, setMaterials] = useState([]);
+  const [meta, setMeta] = useState({ page: 1, total: 0, totalPages: 1 });
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
 
   // فلاتر العرض
   const [status, setStatus] = useState("all");
@@ -44,53 +47,69 @@ function Materials() {
   const [fileUrl, setFileUrl] = useState("");
   const [file, setFile] = useState(null);
   const [uploadSubjects, setUploadSubjects] = useState([]);
+  const latestRequest = useRef(0);
 
   // نجيب كل المواد حسب الفلاتر
   async function load() {
+    const requestId = ++latestRequest.current;
     setLoading(true);
+    setError("");
     try {
-      const data = await api.getAllMaterials({ status, search, subject: subjectFilter, teacher: teacherFilter });
+      const data = await api.getAllMaterials({ status, search, subject: subjectFilter, teacher: teacherFilter, page, limit: 20 });
+      if (requestId !== latestRequest.current) return;
       setMaterials(data.materials || []);
+      setMeta(data.meta || { page, total: (data.materials || []).length, totalPages: 1 });
     } catch (e) {
-      setMsg(e.message);
+      if (requestId === latestRequest.current) setError(e.message || "تعذر تحميل المواد.");
+    } finally {
+      if (requestId === latestRequest.current) setLoading(false);
     }
-    setLoading(false);
   }
 
   // نعيد التحميل مع كل تغيير في الفلاتر (مع debounce بسيط للبحث)
   useEffect(() => {
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
-  }, [status, search, subjectFilter, teacherFilter]);
+  }, [status, search, subjectFilter, teacherFilter, page]);
 
   // قوائم الفلترة: كل المواد الدراسية + المدرسون
   useEffect(() => {
-    api.getSubjects().then((d) => setAllSubjects(d.subjects || [])).catch(() => {});
-    api.getUsers().then((d) => setTeachers((d.users || []).filter((u) => u.role === "teacher"))).catch(() => {});
+    api.getSubjects().then((d) => setAllSubjects(d.subjects || [])).catch((e) => setError(e.message || "تعذر تحميل قائمة المواد الدراسية."));
+    api.getUsers().then((d) => setTeachers((d.users || []).filter((u) => u.role === "teacher"))).catch((e) => setError(e.message || "تعذر تحميل قائمة المدرسين."));
   }, []);
 
   // مواد الصف المختار (لنموذج الرفع)
   useEffect(() => {
     if (!showUpload) return;
-    api.getSubjects(grade).then((d) => setUploadSubjects(d.subjects || [])).catch(() => {});
+    api.getSubjects(grade).then((d) => setUploadSubjects(d.subjects || [])).catch((e) => setError(e.message || "تعذر تحميل مواد الصف المختار."));
   }, [grade, showUpload]);
 
   async function approve(id) {
-    await api.approveMaterial(id);
-    setMsg("تمت الموافقة على المادة ✅");
-    load();
+    setMsg("");
+    setError("");
+    try {
+      await api.approveMaterial(id);
+      setMsg("تمت الموافقة على المادة ✅");
+      load();
+    } catch (e) { setError(e.message || "تعذرت الموافقة على المادة."); }
   }
   async function reject(id) {
-    await api.deleteMaterial(id);
-    setMsg("تم حذف المادة");
-    load();
+    if (!window.confirm("هل تريد حذف هذه المادة؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+    setMsg("");
+    setError("");
+    try {
+      await api.deleteMaterial(id);
+      setMsg("تم حذف المادة");
+      load();
+    } catch (e) { setError(e.message || "تعذر حذف المادة."); }
   }
 
   async function uploadMinistry(e) {
     e.preventDefault();
     setMsg("");
-    if (!title.trim() || !subject) { setMsg("اكتب العنوان واختر المادة"); return; }
-    if (!file && !fileUrl.trim()) { setMsg("ارفع ملفاً أو أدخل رابطاً"); return; }
+    setError("");
+    if (!title.trim() || !subject) { setError("اكتب العنوان واختر المادة"); return; }
+    if (!file && !fileUrl.trim()) { setError("ارفع ملفاً أو أدخل رابطاً"); return; }
     try {
       const fd = new FormData();
       fd.append("title", title.trim());
@@ -102,7 +121,7 @@ function Materials() {
       setMsg(res.message || "تم رفع مادة الوزارة (معتمدة فوراً) ✅");
       setTitle(""); setSubject(""); setFileUrl(""); setFile(null); setShowUpload(false);
       load();
-    } catch (err) { setMsg(err.message); }
+    } catch (err) { setError(err.message || "تعذر رفع المادة."); }
   }
 
   const card = "bg-white rounded-2xl border border-slate-100 shadow-sm";
@@ -124,6 +143,7 @@ function Materials() {
       </div>
 
       {msg && <p className="text-sm bg-blue-50 text-blue-700 rounded-lg p-2 mb-3">{msg}</p>}
+      {error && <p role="alert" className="text-sm bg-red-50 text-red-700 rounded-lg p-3 mb-3">{error}</p>}
 
       {/* نموذج رفع مادة الوزارة */}
       {showUpload && (
@@ -171,7 +191,7 @@ function Materials() {
         {/* تبويبات الحالة */}
         <div className="flex bg-slate-50 rounded-xl p-1">
           {TABS.map((t) => (
-            <button key={t.value} onClick={() => setStatus(t.value)}
+            <button key={t.value} onClick={() => { setPage(1); setStatus(t.value); }}
               className={"px-3 py-1.5 text-xs font-bold rounded-lg " + (status === t.value ? "bg-blue-600 text-white" : "text-slate-500")}>
               {t.label}
             </button>
@@ -180,15 +200,15 @@ function Materials() {
         {/* بحث */}
         <div className="relative flex-1 min-w-[160px]">
           <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالعنوان..." className={input + " pr-9"} />
+          <input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} placeholder="بحث بالعنوان..." className={input + " pr-9"} />
         </div>
         {/* فلترة بالمادة */}
-        <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+        <select value={subjectFilter} onChange={(e) => { setPage(1); setSubjectFilter(e.target.value); }} className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
           <option value="">كل المواد</option>
           {allSubjects.map((s) => <option key={s.id || s._id} value={s.id || s._id}>{s.name} ({s.grade})</option>)}
         </select>
         {/* فلترة بالمدرس */}
-        <select value={teacherFilter} onChange={(e) => setTeacherFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+        <select value={teacherFilter} onChange={(e) => { setPage(1); setTeacherFilter(e.target.value); }} className="border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
           <option value="">كل المدرسين</option>
           {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
@@ -196,10 +216,10 @@ function Materials() {
 
       {/* النتائج */}
       {loading && <p className="text-sm text-slate-400">جاري التحميل...</p>}
-      {!loading && materials.length === 0 && (
+      {!loading && !error && materials.length === 0 && (
         <div className={`${card} p-8 text-center text-slate-400 text-sm`}>لا توجد مواد مطابقة.</div>
       )}
-      <p className="text-xs text-slate-400 mb-2">{materials.length} مادة</p>
+      <p className="text-xs text-slate-400 mb-2">{meta.total} مادة</p>
 
       <div className="space-y-3">
         {materials.map((m) => (
@@ -233,6 +253,10 @@ function Materials() {
             </div>
           </div>
         ))}
+      </div>
+      <div className="flex items-center justify-between gap-3 mt-4 text-sm">
+        <span className="text-slate-500">صفحة {meta.page} من {meta.totalPages}</span>
+        <div className="flex gap-2"><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={loading || page <= 1} className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 disabled:opacity-40"><ChevronRight className="w-4 h-4" />السابق</button><button type="button" onClick={() => setPage((value) => Math.min(meta.totalPages, value + 1))} disabled={loading || page >= meta.totalPages} className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 disabled:opacity-40">التالي<ChevronLeft className="w-4 h-4" /></button></div>
       </div>
     </div>
   );

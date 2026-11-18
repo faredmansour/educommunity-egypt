@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { api } from "../api.js";
 
 // تسجيل دخول الأدمن — لازم يكون الدور admin
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("admin@edu.eg");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -19,6 +20,9 @@ function Login() {
       const data = await api.login({ email, password });
       // لو المستخدم مش أدمن نرفض
       if (data.user?.role !== "admin") {
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_refresh_token");
+        localStorage.removeItem("admin_user");
         setError("هذه اللوحة للأدمن فقط");
         setLoading(false);
         return;
@@ -26,7 +30,8 @@ function Login() {
       localStorage.setItem("admin_token", data.token);
       localStorage.setItem("admin_refresh_token", data.refreshToken);
       localStorage.setItem("admin_user", JSON.stringify(data.user));
-      navigate("/");
+      const destination = location.state?.from;
+      navigate(destination?.pathname || "/", { replace: true });
     } catch (err) {
       setError(err.message || "بيانات الدخول غير صحيحة");
     }

@@ -26,7 +26,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContext";
 const queryClient = new QueryClient();
-const App = () => <QueryClientProvider client={queryClient}><TooltipProvider><AuthProvider><SocketProvider><Toaster /><Sonner /><BrowserRouter><Routes><Route path="/" element={<Landing />} /><Route path="/auth" element={<Auth />} />{
+const App = () => <QueryClientProvider client={queryClient}><TooltipProvider><AuthProvider><SocketProvider><Toaster /><Sonner /><BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes><Route path="/" element={<Landing />} /><Route path="/auth" element={<Auth />} />{
   /* أقسام عامة (تصفّح بدون تسجيل) */
 }<Route path="/feed" element={<AppLayout><Feed /></AppLayout>} /><Route path="/challenges" element={<AppLayout><Challenges /></AppLayout>} /><Route path="/leaderboard" element={<AppLayout><Leaderboard /></AppLayout>} /><Route path="/teachers" element={<AppLayout><TeacherRating /></AppLayout>} />{
   /* أقسام تتطلب تسجيل دخول */

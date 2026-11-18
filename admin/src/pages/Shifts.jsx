@@ -11,10 +11,18 @@ function Shifts() {
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   async function load() {
-    const data = await api.getShifts();
-    setShifts(data.shifts || []);
+    setError("");
+    setLoading(true);
+    try {
+      const data = await api.getShifts();
+      setShifts(data.shifts || []);
+    } catch (err) {
+      setError(err.message || "تعذر تحميل الشيفتات.");
+    } finally { setLoading(false); }
   }
 
   useEffect(() => {
@@ -24,7 +32,7 @@ function Shifts() {
       const list = (data.users || []).filter((u) => u.role === "teacher");
       setTeachers(list);
       if (list[0]) setTeacher(list[0].id);
-    });
+    }).catch((err) => setError(err.message || "تعذر تحميل قائمة المدرسين."));
   }, []);
 
   function isNow(s) {
@@ -39,7 +47,12 @@ function Shifts() {
       setMsg("لازم تملأ كل الحقول");
       return;
     }
+    if (new Date(endsAt) <= new Date(startsAt)) {
+      setMsg("وقت النهاية لازم يكون بعد وقت البداية.");
+      return;
+    }
     try {
+      setError("");
       await api.createShift({ teacher, subject, startsAt, endsAt });
       setMsg("تم إضافة الشيفت ✅");
       setSubject("");
@@ -47,13 +60,16 @@ function Shifts() {
       setEndsAt("");
       load();
     } catch (err) {
-      setMsg(err.message);
+      setError(err.message || "تعذر إضافة الشيفت.");
     }
   }
 
   async function remove(id) {
-    await api.deleteShift(id);
-    load();
+    if (!window.confirm("هل تريد حذف هذا الشيفت؟")) return;
+    try {
+      await api.deleteShift(id);
+      await load();
+    } catch (err) { setError(err.message || "تعذر حذف الشيفت."); }
   }
 
   const input = "w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500";
@@ -67,6 +83,7 @@ function Shifts() {
       <p className="text-sm text-slate-400 mb-5">عيّن مدرس مناوب لكل مادة عشان الطالب يلاقي حد يسأله في أي وقت.</p>
 
       {msg && <p className="text-sm bg-blue-50 text-blue-700 rounded-lg p-2 mb-4">{msg}</p>}
+      {error && <p role="alert" className="text-sm bg-red-50 text-red-700 rounded-lg p-3 mb-4">{error}</p>}
 
       {/* نموذج إضافة شيفت */}
       <form onSubmit={add} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-6 grid sm:grid-cols-5 gap-3 items-end">
@@ -97,7 +114,8 @@ function Shifts() {
 
       {/* قائمة الشيفتات */}
       <div className="space-y-3">
-        {shifts.length === 0 && <p className="text-sm text-slate-400">لا توجد شيفتات بعد.</p>}
+        {loading && <p className="text-sm text-slate-400">جارٍ تحميل الشيفتات...</p>}
+        {!loading && !error && shifts.length === 0 && <p className="text-sm text-slate-400">لا توجد شيفتات بعد.</p>}
         {shifts.map((s) => (
           <div key={s._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center justify-between">
             <div>

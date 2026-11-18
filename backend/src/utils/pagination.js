@@ -2,8 +2,10 @@
 
 // بناخد ?page=2&limit=9 من الرابط ونحوّلهم لأرقام + نحسب skip
 function getPagination(query, defaultLimit = 9) {
-  const page = Math.max(parseInt(query.page) || 1, 1);          // أقل حاجة صفحة 1
-  const limit = Math.min(parseInt(query.limit) || defaultLimit, 100); // أقصى حاجة 100
+  const requestedPage = Number.parseInt(query.page, 10);
+  const requestedLimit = Number.parseInt(query.limit, 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const limit = Math.min(Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : defaultLimit, 100);
   const skip = (page - 1) * limit;                               // نتخطّى صفحات قبلها
   return { page, limit, skip };
 }

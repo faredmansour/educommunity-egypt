@@ -11,12 +11,13 @@ async function stats(req, res) {
 }
 
 async function listUsers(req, res) {
-  const users = await adminService.listUsers();
-  return sendSuccess(res, { users });
+  const result = await adminService.listUsers(req.query);
+  if (Array.isArray(result)) return sendSuccess(res, { users: result });
+  return sendSuccess(res, { users: result.users }, '', result.meta);
 }
 
 async function deleteUser(req, res) {
-  await adminService.deleteUser(req.params.id);
+  await adminService.deleteUser(req.params.id, req.user.id);
   return sendSuccess(res, { ok: true }, 'تم حذف المستخدم');
 }
 

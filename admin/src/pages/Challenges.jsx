@@ -7,18 +7,32 @@ function Challenges() {
   const [challenges, setChallenges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState([]);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    Promise.all([api.getChallenges(), api.getPendingChallenges()]).then(([active, waiting]) => {
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const [active, waiting] = await Promise.all([api.getChallenges(), api.getPendingChallenges()]);
       setChallenges(active.challenges || []);
       setPending(waiting.challenges || []);
-    }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    } catch (err) {
+      setError(err.message || "تعذر تحميل التحديات.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const updateStatus = (id, action) => {
-    const request = action === "approve" ? api.approveChallenge(id) : api.rejectChallenge(id);
-    request.then(() => setPending((items) => items.filter((item) => (item.id || item._id) !== id))).catch(() => {});
-  };
+  useEffect(() => { load(); }, []);
+
+  async function updateStatus(id, action) {
+    setError("");
+    try {
+      if (action === "approve") await api.approveChallenge(id);
+      else await api.rejectChallenge(id);
+      await load();
+    } catch (err) { setError(err.message || "تعذر تحديث حالة المسابقة."); }
+  }
 
   const card = "bg-white rounded-2xl border border-slate-100 shadow-sm";
 
@@ -29,6 +43,8 @@ function Challenges() {
         <h1 className="text-xl font-extrabold text-slate-800">متابعة التحديات</h1>
       </div>
       <p className="text-sm text-slate-400 mb-5">التحديات النشطة على المنصة ونقاطها.</p>
+
+      {error && <p role="alert" className="text-sm bg-red-50 text-red-700 rounded-lg p-3 mb-4">{error}</p>}
 
       {pending.length > 0 && (
         <div className="mb-6">
@@ -46,7 +62,7 @@ function Challenges() {
       )}
 
       {loading && <p className="text-sm text-slate-400">جاري التحميل...</p>}
-      {!loading && challenges.length === 0 && (
+      {!loading && !error && challenges.length === 0 && (
         <div className={`${card} p-8 text-center text-slate-400 text-sm`}>لا توجد تحديات نشطة.</div>
       )}
 

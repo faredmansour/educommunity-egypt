@@ -6,9 +6,10 @@ import { api } from "../api.js";
 function SoftSkills() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    api.getTasks().then((d) => setTasks(d.tasks || [])).catch(() => {}).finally(() => setLoading(false));
+    api.getTasks().then((d) => setTasks(d.tasks || [])).catch((err) => setError(err.message || "تعذر تحميل المهارات الناعمة.")).finally(() => setLoading(false));
   }, []);
 
   const card = "bg-white rounded-2xl border border-slate-100 shadow-sm";
@@ -22,7 +23,8 @@ function SoftSkills() {
       <p className="text-sm text-slate-400 mb-5">تاسكات المهارات اللي أنشأها المدرسون للطلاب.</p>
 
       {loading && <p className="text-sm text-slate-400">جاري التحميل...</p>}
-      {!loading && tasks.length === 0 && (
+      {error && <p role="alert" className="text-sm bg-red-50 text-red-700 rounded-lg p-3 mb-4">{error}</p>}
+      {!loading && !error && tasks.length === 0 && (
         <div className={`${card} p-8 text-center text-slate-400 text-sm`}>لا توجد تاسكات بعد.</div>
       )}
 
